@@ -54,15 +54,15 @@ if ($action) {
 $PAGE->set_url($url);
 
 if (!$cm = get_coursemodule_from_id('certificate', $id)) {
-    print_error('Course Module ID was incorrect');
+    throw new invalid_parameter_exception('Course Module ID was incorrect');
 }
 
 if (!$course = $DB->get_record('course', array('id'=> $cm->course))) {
-    print_error('Course is misconfigured');
+    throw new invalid_parameter_exception('Course is misconfigured');
 }
 
 if (!$certificate = $DB->get_record('certificate', array('id'=> $cm->instance))) {
-    print_error('Certificate ID was incorrect');
+    throw new invalid_parameter_exception('Certificate ID was incorrect');
 }
 
 // Requires a course login
@@ -105,7 +105,8 @@ if (!$users = certificate_get_issues($certificate->id, $DB->sql_fullname(), $gro
 }
 
 // Get extra fields to show the user.
-$extrafields = get_extra_user_fields($context);
+$fieldsapi = \core_user\fields::for_identity($context, false);
+$extrafields = $fieldsapi->get_required_fields();
 
 if ($download == "ods") {
     require_once("$CFG->libdir/odslib.class.php");
@@ -124,7 +125,7 @@ if ($download == "ods") {
     $myxls->write_string(0, 1, get_string("firstname"));
     $nextposition = 2;
     foreach ($extrafields as $field) {
-        $myxls->write_string(0, $nextposition, get_user_field_name($field));
+        $myxls->write_string(0, $nextposition, \core_user\fields::get_display_name($field));
         $nextposition++;
     }
     $myxls->write_string(0, $nextposition, get_string("group"));
@@ -180,7 +181,7 @@ if ($download == "xls") {
     $myxls->write_string(0, 1, get_string("firstname"));
     $nextposition = 2;
     foreach ($extrafields as $field) {
-        $myxls->write_string(0, $nextposition, get_user_field_name($field));
+        $myxls->write_string(0, $nextposition, \core_user\fields::get_display_name($field));
         $nextposition++;
     }
     $myxls->write_string(0, $nextposition, get_string("group"));
@@ -231,7 +232,7 @@ if ($download == "txt") {
     // Print names of all the fields
     echo get_string("lastname"). "\t" .get_string("firstname") . "\t";
     foreach ($extrafields as $field) {
-        echo get_user_field_name($field) . "\t";
+        echo \core_user\fields::get_display_name($field) . "\t";
     }
     echo get_string("group"). "\t";
     echo $strdate. "\t";
@@ -271,7 +272,7 @@ $table->tablealign = "center";
 $table->head = array($strto);
 $table->align = array('left');
 foreach ($extrafields as $field) {
-    $table->head[] = get_user_field_name($field);
+    $table->head[] = \core_user\fields::get_display_name($field);
     $table->align[] = 'left';
 }
 $table->head = array_merge($table->head, array($strdate, $strgrade, $strcode));

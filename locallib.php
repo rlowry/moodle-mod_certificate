@@ -335,7 +335,7 @@ function certificate_print_user_files($certificate, $userid, $contextid) {
         $filename = $file->get_filename();
         $link = file_encode_url($CFG->wwwroot.'/pluginfile.php', '/'.$contextid.'/mod_certificate/issue/'.$certrecord->id.'/'.$filename);
 
-        $output = '<img src="'.$OUTPUT->pix_url(file_mimetype_icon($file->get_mimetype())).'" height="16" width="16" alt="'.$file->get_mimetype().'" />&nbsp;'.
+        $output = '<img src="'.$OUTPUT->image_url(file_mimetype_icon($file->get_mimetype())).'" height="16" width="16" alt="'.$file->get_mimetype().'" />&nbsp;'.
             '<a href="'.$link.'" >'.s($filename).'</a>';
 
     }
@@ -389,7 +389,7 @@ function certificate_get_issue($course, $user, $certificate, $cm) {
  * @param int $perpage total per page
  * @return stdClass the users
  */
-function certificate_get_issues($certificateid, $sort="ci.timecreated ASC", $groupmode, $cm, $page = 0, $perpage = 0) {
+function certificate_get_issues($certificateid, $sort, $groupmode, $cm, $page = 0, $perpage = 0) {
     global $DB, $USER;
 
     $context = context_module::instance($cm->id);
@@ -448,11 +448,15 @@ function certificate_get_issues($certificateid, $sort="ci.timecreated ASC", $gro
     $allparams = $conditionsparams + array('certificateid' => $certificateid);
 
     // The picture fields also include the name fields for the user.
-    $picturefields = user_picture::fields('u', get_extra_user_fields($context));
-    $users = $DB->get_records_sql("SELECT $picturefields, u.idnumber, ci.code, ci.timecreated
+    $userfieldsapi = \core_user\fields::for_identity($context, false)->with_userpic();
+    ['selects' => $fieldselect, 'joins' => $fieldjoin, 'params' => $fieldjoinparams] =
+        (array)$userfieldsapi->get_sql('u', true, '', '', false);
+    $allparams += $fieldjoinparams;
+    $users = $DB->get_records_sql("SELECT $fieldselect, u.idnumber, ci.code, ci.timecreated
                                      FROM {user} u
                                INNER JOIN {certificate_issues} ci
                                        ON u.id = ci.userid
+                               $fieldjoin
                                     WHERE u.deleted = 0
                                       AND ci.certificateid = :certificateid $conditionssql
                                  ORDER BY {$sort}", $allparams, $page * $perpage, $perpage);
@@ -1037,7 +1041,7 @@ function certificate_get_code($certificate, $certrecord) {
 /**
  * Sends text to output given the following params.
  *
- * @param stdClass $pdf
+ * @param TCPDF $pdf
  * @param int $x horizontal position
  * @param int $y vertical position
  * @param char $align L=left, C=center, R=right
@@ -1047,7 +1051,10 @@ function certificate_get_code($certificate, $certrecord) {
  * @param string $text the text to print
  * @param int $width horizontal dimension of text block
  */
-function certificate_print_text($pdf, $x, $y, $align, $font='freeserif', $style, $size = 10, $text, $width = 0) {
+function certificate_print_text($pdf, $x, $y, $align, $font, $style, $size, $text, $width = 0) {
+    if ($style === null) {
+        $style = '';
+    }
     $pdf->setFont($font, $style, $size);
     $pdf->SetXY($x, $y);
     $pdf->writeHTMLCell($width, 0, '', '', $text, 0, 0, 0, true, $align);
